@@ -12,6 +12,16 @@ print ('FILE SERVER is ready to receive...')
 file_version_map = {}
 
 
+'''
+Input: 
+	filename: actual filename
+	RW: read or write, 'r' or 'a+'
+	text: text to write 
+	file_version_map: server side file version map
+
+Return: 
+	(file content, file version)
+'''
 def read_write(filename, RW, text, file_version_map):
 	if RW == "r":	# if read request
 		if os.stat(filename).st_size != 0:

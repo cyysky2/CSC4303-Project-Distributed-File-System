@@ -1,5 +1,6 @@
 # file server
 from socket import *
+import os
 
 server_addr = "localhost"
 server_port = 12003

@@ -27,6 +27,23 @@ def send_write(client_socket, fileserverIP_DS, fileserverPORT_DS, filename , RW,
     client_socket.send(send_msg.encode())
     #print ("SENT " + send_msg + " to " + str(fileserverIP_DS) + " " + str(fileserverPORT_DS))
 
+
+'''
+Input:
+    client_socket: Socket service at client side
+    fileserverIP_DS: Not primary (replica) file server's IP
+    fileserverPORT_DS: Not primary (replica) file server's port. 
+    filename: actual_filename in the csv
+    RW: read or write. 'r' or 'a+' or 'w'
+    file_version_map: client side file version map
+    msg: 'READ', text to write. Tirvial when read.
+    filename_DS: actual_filename in the csv
+    client_id: client id in dates.
+
+Return: 
+    True: if the file is in cache, ready to read
+    False: if the file is outdated or not in cache. 
+'''
 def send_read(client_socket, fileserverIP_DS, fileserverPORT_DS, filename , RW, file_version_map, msg, filename_DS, client_id):
     if filename not in file_version_map:
         file_version_map[filename] = 0
@@ -71,7 +88,7 @@ def send_read(client_socket, fileserverIP_DS, fileserverPORT_DS, filename , RW, 
 def lock_unlock_file(client_socket, client_id, filename, lock_or_unlock):
 
     serverName = 'localhost'
-    serverPort = 4040   # port of directory service
+    serverPort = 4040   # port of lock service
     client_socket.connect((serverName,serverPort))
 
     if lock_or_unlock == "lock":
@@ -125,6 +142,7 @@ def handle_write(filename, client_id, file_version_map):
         while True:
             client_input = sys.stdin.readline()
             if "<end>" in client_input:  # check if user wants to finish writing
+                write_client_input += client_input.split("<end>")[0]
                 break
             else: 
                 write_client_input += client_input
@@ -220,7 +238,7 @@ def send_directory_service(client_socket, filename, RW, list_files):
         reply = client_socket.recv(1024)
         reply = reply.decode()
     else:
-        msg = "LIST"
+        msg = "LIST" + '|' + RW
         # send the string requesting file info to directory service
         client_socket.send(msg.encode())
         reply = client_socket.recv(1024)

@@ -36,7 +36,7 @@ def main():
         
         if "<list>" in client_input:
             client_socket = client_lib.create_socket()
-            client_lib.send_directory_service(client_socket, "", True)
+            client_lib.send_directory_service(client_socket, "", "r", True)
             client_socket.close()
 
         #if "<create>" in client_input:
