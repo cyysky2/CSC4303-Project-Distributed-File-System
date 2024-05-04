@@ -82,7 +82,7 @@ def main():
 
 		#print("RECEIVED: " + recv_msg)
 
-		if (recv_msg != "") and ("CHECK_VERSION" not in recv_msg) and ("REPLICATE" not in recv_msg):
+		if (recv_msg != "") and ("CHECK_VERSION" not in recv_msg) and ("REPLICATE" not in recv_msg) and ("DELETE|" not in recv_msg):
 			# parse the message
 
 			filename = recv_msg.split("|")[0]	# file path to perform read/write on
@@ -114,6 +114,19 @@ def main():
 			f.write(rep_text)
 			f.close()
 			print(rep_filename + " successfully replicated...\n")
+
+		elif "DELETE|" in recv_msg:
+			rep_filename = recv_msg.split("|")[1]
+			rep_text = recv_msg.split("|")[2]
+			rep_version = recv_msg.split("|")[3]
+
+			try: 
+				os.remove(rep_filename)
+				del file_version_map[rep_filename]
+				print("Successfully deleteded '", rep_filename, "'")
+			except:
+				pass
+			
 
 
 	connection_socket.close()

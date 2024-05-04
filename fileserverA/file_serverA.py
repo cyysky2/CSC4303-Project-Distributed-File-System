@@ -1,5 +1,6 @@
 # file server
 from socket import *
+import os
 
 server_addr = "localhost"
 server_port = 12001
@@ -35,6 +36,27 @@ def replicate(filename):
 	replicate_socket.send(msg.encode())
 	replicate_socket.close()
 
+def remove_replicate(filename):
+
+	try: 
+		msg = "DELETE|" + filename + "|" + "delete" + "|" + str(file_version_map[filename])
+	except:
+		msg = "DELETE|" + filename + "|" + "delete" + "|0"
+	port = 12002
+	server_ip = 'localhost'
+	print("Replicating to fileserver B")
+	replicate_socket = socket(AF_INET, SOCK_STREAM)
+	replicate_socket.connect((server_ip,port))
+	replicate_socket.send(msg.encode())
+	replicate_socket.close()
+
+	port = 12003
+	server_ip = 'localhost'
+	print("Replicating to fileserver C")
+	replicate_socket = socket(AF_INET, SOCK_STREAM)
+	replicate_socket.connect((server_ip,port))
+	replicate_socket.send(msg.encode())
+	replicate_socket.close()
 
 
 def read_write(filename, RW, text, file_version_map):
@@ -64,6 +86,29 @@ def read_write(filename, RW, text, file_version_map):
 		
 		print("FILE_VERSION: " + str(file_version_map[filename]))
 		return ("Success", file_version_map[filename])
+	
+	elif RW == "new":
+		file_version_map[filename] = 0	
+		file = open(filename, 'w')
+		file.write(text)
+		print("File '", filename,"' created")
+		print("FILE_VERSION: " + str(file_version_map[filename]))
+
+		return ("Successfully newed", file_version_map[filename])
+	
+	elif RW == 'del':
+		remove_replicate(filename)
+		# the file may not actually exist and cause error. file1~6 for example
+		try:
+			os.remove(filename)
+			file_version = file_version_map[filename]
+			del file_version_map[filename]
+			print("File '", filename,"' deleted.")
+			return ("Successfully deleteded", file_version)
+		except:
+			return ("Successfully deleteded", "0")
+			
+		
 
 
 def send_client_reply(response, RW, connection_socket):
@@ -83,11 +128,16 @@ def send_client_reply(response, RW, connection_socket):
 		reply = "File does not exist\n"
 		connection_socket.send(reply.encode())
 		#print ("Sent: " + reply)
+
+	elif response[0] == "Successfully newed":
+		reply = "File successfully created..." + str(response[1])
+		connection_socket.send(reply.encode())
+
+	elif response[0] == "Successfully deleteded":
+		reply = "File successfully deleted..." + str(response[1])
+		connection_socket.send(reply.encode())
 	
 def main():
-
-	
-
 	while 1:
 		response = ""
 		connection_socket, addr = server_socket.accept()
@@ -98,20 +148,31 @@ def main():
 		#print("RECEIVED: " + recv_msg)
 
 		if recv_msg != "" and "CHECK_VERSION" not in recv_msg:
-			# parse the message
-
 			filename = recv_msg.split("|")[0]	# file path to perform read/write on
-			print ("Filename: " + filename)
 			RW = recv_msg.split("|")[1]			# whether its a read or write
-			print ("RW: " + RW)
 			text = recv_msg.split("|")[2]		# the text to be written (this text is "READ" for a read and is ignored)
-			print ("TEXT: " + text)
-
-			response = read_write(filename, RW, text, file_version_map)	# perform the read/write and check if successful
-			send_client_reply(response, RW, connection_socket)		# send back write successful message or send back text for client to read
-
-			if RW == 'a+':
+			
+			if RW == 'new':
+				response = read_write(filename, RW, text, file_version_map)
+				send_client_reply(response, RW, connection_socket)
+				# create replicate at B and C
 				replicate(filename)
+
+			elif RW == 'del':
+				response = read_write(filename, RW, text, file_version_map)
+				send_client_reply(response, RW, connection_socket)
+
+			else:
+				# parse the message
+				print ("Filename: " + filename)
+				print ("RW: " + RW)
+				print ("TEXT: " + text)
+
+				response = read_write(filename, RW, text, file_version_map)	# perform the read/write and check if successful
+				send_client_reply(response, RW, connection_socket)		# send back write successful message or send back text for client to read
+
+				if RW == 'a+':
+					replicate(filename)
 
 
 		elif "CHECK_VERSION" in recv_msg:

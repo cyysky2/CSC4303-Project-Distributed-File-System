@@ -254,6 +254,8 @@ def instructions():
     # instructions to the user
     print ("------------------- INSTRUCTIONS ----------------------")
     print ("<write> [filename] - write to file mode")
+    print ("<create> [filename] - create file mode")
+    print ("<delete> [filename] - delete file mode")
     print ("<end> - finish writing")
     print ("<read> [filename] - read from file mode")
     print ("<list> - lists all existing files")
@@ -272,3 +274,121 @@ def check_valid_input(input_string):
         return False
     else:
         return True
+
+
+def create_file(filename, client_id, file_version_map):
+    client_socket = create_socket()  # create socket to directory service
+    reply_DS = send_directory_service(client_socket, filename, 'new', False)  # request the file info from directory service
+    client_socket.close()   # close the connection 
+
+    if reply_DS == "FILE_ALREADY_EXIST":
+        print("File '", filename,"' already exists.")
+    else:
+        filename_DS = reply_DS.split('|')[0]
+        fileserverIP_DS = reply_DS.split('|')[1]
+        fileserverPORT_DS = reply_DS.split('|')[2]
+
+        # ------ LOCKING ------
+        client_socket = create_socket()
+        grant_lock = lock_unlock_file(client_socket, client_id, filename_DS, "lock")
+        client_socket.close()
+
+        while grant_lock != "file_granted":
+            print("File not granted, polling again...")
+            client_socket = create_socket()
+            grant_lock = lock_unlock_file(client_socket, client_id, filename_DS, "lock")
+            client_socket.close()
+
+            if grant_lock == "TIMEOUT":     # if timeout message received from locking service, break
+                return False
+
+            time.sleep(0.1)     # wait 0.1 sec if lock not available and request it again
+
+        print("You are granted the file...")
+
+        # ------ WRITING TO FS ------
+        client_socket = create_socket()
+        send_write(client_socket, fileserverIP_DS, int(fileserverPORT_DS), filename_DS, "new", file_version_map,"")
+        #print ("SENT FOR WRITE")
+        reply_FS = client_socket.recv(1024)
+        reply_FS = reply_FS.decode()
+        client_socket.close()
+
+        print (reply_FS.split("...")[0])    # split version num from success message and print message
+        version_num = int(reply_FS.split("...")[1]) 
+        
+        if version_num != file_version_map[filename_DS]:
+            print("Server version no changed - updating client version no.")
+            file_version_map[filename_DS] = version_num
+
+        # ------ CACHING ------
+        cache(filename_DS, "", "w", client_id)
+
+        # ------ UNLOCKING ------
+        client_socket = create_socket()
+        reply_unlock = lock_unlock_file(client_socket, client_id, filename_DS, "unlock")
+        client_socket.close()
+        print (reply_unlock)
+
+        print("File creatation successful")
+
+    return True
+
+
+def delete_file(filename, client_id, file_version_map):
+    client_socket = create_socket()  # create socket to directory service
+    reply_DS = send_directory_service(client_socket, filename, 'del', False)  # request the file info from directory service
+    client_socket.close()   # close the connection 
+
+    if reply_DS == "FILE_DOES_NOT_EXIST":
+        print("The file does not exist to be deleted. Abort.")
+    else:
+        filename_DS = reply_DS.split('|')[0]
+        fileserverIP_DS = reply_DS.split('|')[1]
+        fileserverPORT_DS = reply_DS.split('|')[2]
+
+        # ------ LOCKING ------
+        client_socket = create_socket()
+        grant_lock = lock_unlock_file(client_socket, client_id, filename_DS, "lock")
+        client_socket.close()
+
+        while grant_lock != "file_granted":
+            print("File not granted, polling again...")
+            client_socket = create_socket()
+            grant_lock = lock_unlock_file(client_socket, client_id, filename_DS, "lock")
+            client_socket.close()
+
+            if grant_lock == "TIMEOUT":     # if timeout message received from locking service, break
+                return False
+
+            time.sleep(0.1)     # wait 0.1 sec if lock not available and request it again
+
+        print("You are granted the file...")
+
+
+        # ------ WRITING TO FS ------
+        client_socket = create_socket()
+        send_write(client_socket, fileserverIP_DS, int(fileserverPORT_DS), filename_DS, "del", file_version_map,"")
+        #print ("SENT FOR WRITE")
+        reply_FS = client_socket.recv(1024)
+        reply_FS = reply_FS.decode()
+        client_socket.close()
+         
+        
+        
+        # ------ DELETING    ------
+        cache_file = curr_path + "\\client_cache" + client_id + "\\" + filename_DS
+        try:
+            os.remove(cache_file)
+            del file_version_map[filename_DS]
+        except:
+            pass
+    
+        # ------ UNLOCKING ------
+        client_socket = create_socket()
+        reply_unlock = lock_unlock_file(client_socket, client_id, filename_DS, "unlock")
+        client_socket.close()
+        print (reply_unlock)
+
+        print("File successfully deleted.")
+    return True

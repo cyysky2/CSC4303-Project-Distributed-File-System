@@ -36,18 +36,25 @@ def main():
         
         if "<list>" in client_input:
             client_socket = client_lib.create_socket()
-            client_lib.send_directory_service(client_socket, "", "r", True)
+            client_lib.send_directory_service(client_socket, "", True)
             client_socket.close()
 
-        #if "<create>" in client_input:
-        #    while not client_lib.check_valid_input(client_input):       # error check the input
-        #         client_input = sys.stdin.readline()
-        #    filename = client_input.split()[1]
-        #    client_lib.create_file(filename)
+        if "<create>" in client_input:
+            while not client_lib.check_valid_input(client_input):       # error check the input
+                client_input = sys.stdin.readline()
+            filename = client_input.split()[1]
+            client_lib.create_file(filename, client_id, file_version_map)
+            print("Exiting <create> mode...\n")
+
+        if "<delete>" in client_input:
+            while not client_lib.check_valid_input(client_input):       # error check the input
+                client_input = sys.stdin.readline()
+            filename = client_input.split()[1]
+            client_lib.delete_file(filename, client_id, file_version_map)
+            print("Exiting <delete> mode...\n")
 
         if "<instructions>" in client_input:
             client_lib.instructions()
-
 
         if "<quit>" in client_input:
             print("Exiting application...")
